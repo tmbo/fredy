@@ -2,35 +2,12 @@ import React from 'react';
 
 import { useDispatch, useSelector } from 'react-redux';
 
-import { Button, Form, Header, Icon, Message, Popup, Segment } from 'semantic-ui-react';
+import { Button, Form, Icon, Message, Segment, Radio } from 'semantic-ui-react';
 import ToastContext from '../../components/toasts/ToastContext';
 import Headline from '../../components/headline/Headline';
 import { xhrPost } from '../../services/xhr';
-
+import { SegmentPart } from '../../components/segment/SegmentPart';
 import './GeneralSettings.less';
-
-const SegmentPart = ({ name, icon, children, helpText }) => (
-  <React.Fragment>
-    <Header as="h5" inverted attached="top" sub>
-      <Icon name={icon} inverted size="mini" />
-      <Header.Content>{name}</Header.Content>
-    </Header>
-
-    <Popup
-      content={helpText}
-      trigger={
-        <span className="generalSettings__help">
-          {' '}
-          <Icon name="help circle" inverted />
-          What is this?
-        </span>
-      }
-    />
-    <Segment inverted attached>
-      {children}
-    </Segment>
-  </React.Fragment>
-);
 
 const GeneralSettings = function Users() {
   const dispatch = useDispatch();
@@ -41,6 +18,7 @@ const GeneralSettings = function Users() {
   const [interval, setInterval] = React.useState('');
   const [port, setPort] = React.useState('');
   const [scrapingAntApiKey, setScrapingAntApiKey] = React.useState('');
+  const [scrapingAntProxy, setScrapingAntProxy] = React.useState('');
   const [workingHourFrom, setWorkingHourFrom] = React.useState(null);
   const [workingHourTo, setWorkingHourTo] = React.useState(null);
   const ctx = React.useContext(ToastContext);
@@ -56,6 +34,7 @@ const GeneralSettings = function Users() {
     setScrapingAntApiKey(settings?.scrapingAnt?.apiKey);
     setWorkingHourFrom(settings?.workingHours?.from);
     setWorkingHourTo(settings?.workingHours?.to);
+    setScrapingAntProxy(settings?.scrapingAnt?.proxy || 'datacenter');
   }, [settings]);
 
   const nullOrEmpty = (val) => val == null || val.length === 0;
@@ -92,6 +71,7 @@ const GeneralSettings = function Users() {
         port,
         scrapingAnt: {
           apiKey: scrapingAntApiKey,
+          proxy: scrapingAntProxy,
         },
         workingHours: {
           from: workingHourFrom,
@@ -111,7 +91,7 @@ const GeneralSettings = function Users() {
       {!loading && (
         <React.Fragment>
           <Headline text="General Settings" />
-          <Message info>
+          <Message className="generalSettings__message">
             <h5>
               <Icon name="info circle" />
               Info
@@ -168,6 +148,48 @@ const GeneralSettings = function Users() {
             </SegmentPart>
 
             <SegmentPart
+              name="ScrapingAnt proxy settings"
+              helpText="Scraping ant provides different proxies."
+              icon="key"
+            >
+              <Message info>
+                ScrapingAnt is needed to scrape Immoscout. ScrapingAnt itself is using 2 different types of proxies.{' '}
+                <br />
+                <h4>Datacenter-Proxy</h4>
+                Proxy server located in one of the datacenters across the world. Datacenter proxies are slower and more
+                likely to fail, but they are cheaper. A call with a datacenter proxy cost 10 credits.
+                <h4>Residential-Proxy</h4>
+                High-quality proxy server located in one of the real people houses across the world. Datacenter proxies
+                are faster and more likely to success, but they are more expensive. A call with a datacenter proxy cost
+                250 credits.
+                <br />
+                <br />
+                <b>
+                  On the free tier, you have 10.000 credits, so chose your option wisely. Keep in mind, only successful
+                  calls will be charged.
+                </b>
+              </Message>
+              <Form.Field>
+                <Radio
+                  label="Datacenter proxy"
+                  name="scrapingAntProxy"
+                  value="datacenter"
+                  checked={scrapingAntProxy === 'datacenter'}
+                  onChange={(e, { value }) => setScrapingAntProxy(value)}
+                />
+              </Form.Field>
+              <Form.Field>
+                <Radio
+                  label="Residential proxy"
+                  name="scrapingAntProxy"
+                  value="residential"
+                  checked={scrapingAntProxy === 'residential'}
+                  onChange={(e, { value }) => setScrapingAntProxy(value)}
+                />
+              </Form.Field>
+            </SegmentPart>
+
+            <SegmentPart
               name="Working hours"
               helpText="During this hours, Fredy will search for new apartments. If nothing is configured, Fredy will search around the clock."
               icon="calendar outline"
@@ -176,7 +198,7 @@ const GeneralSettings = function Users() {
                 <Form.Input
                   className="generalSettings__time"
                   type="time"
-                  placeholder="ScrapingAnt Api Key"
+                  placeholder="Working hours from"
                   inverted
                   size="mini"
                   width={2}
@@ -186,7 +208,7 @@ const GeneralSettings = function Users() {
                 <div className="generalSettings__until">until</div>
                 <Form.Input
                   type="time"
-                  placeholder="ScrapingAnt Api Key"
+                  placeholder="Working hours to"
                   inverted
                   size="mini"
                   width={2}
