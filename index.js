@@ -1,63 +1,41 @@
-const fs = require('fs');
-
+import fs from 'fs';
+import { config } from './lib/utils.js';
+import * as similarityCache from './lib/services/similarity-check/similarityCache.js';
+import { setLastJobExecution } from './lib/services/storage/listingsStorage.js';
+import * as jobStorage from './lib/services/storage/jobStorage.js';
+import FredyRuntime from './lib/FredyRuntime.js';
+import { duringWorkingHoursOrNotSet } from './lib/utils.js';
+import './lib/api/api.js';
 //if db folder does not exist, ensure to create it before loading anything else
 if (!fs.existsSync('./db')) {
   fs.mkdirSync('./db');
 }
-
 const path = './lib/provider';
 const provider = fs.readdirSync(path).filter((file) => file.endsWith('.js'));
-const config = require('./conf/config.json');
-
-const similarityCache = require('./lib/services/similarity-check/similarityCache');
-const { setLastJobExecution } = require('./lib/services/storage/listingsStorage');
-const jobStorage = require('./lib/services/storage/jobStorage');
-const FredyRuntime = require('./lib/FredyRuntime');
-
-const { duringWorkingHoursOrNotSet } = require('./lib/utils');
-
-//starting the api service
-require('./lib/api/api');
-
 //assuming interval is always in minutes
 const INTERVAL = config.interval * 60 * 1000;
-
 /* eslint-disable no-console */
 console.log(`Started Fredy successfully. Ui can be accessed via http://localhost:${config.port}`);
 /* eslint-enable no-console */
+const fetchedProvider = await Promise.all(
+  provider.filter((provider) => provider.endsWith('.js')).map(async (pro) => import(`${path}/${pro}`))
+);
+
 setInterval(
   (function exec() {
     const isDuringWorkingHoursOrNotSet = duringWorkingHoursOrNotSet(config, Date.now());
-
     if (isDuringWorkingHoursOrNotSet) {
       config.lastRun = Date.now();
       jobStorage
         .getJobs()
         .filter((job) => job.enabled)
         .forEach((job) => {
-          const providerIds = job.provider.map((provider) => provider.id);
-
-          provider
-            .filter((provider) => provider.endsWith('.js'))
-            .map((pro) => require(`${path}/${pro}`))
-            .filter((provider) => providerIds.indexOf(provider.metaInformation.id) !== -1)
-            .forEach(async (pro) => {
-              const providerId = pro.metaInformation.id;
-              if (providerId == null || providerId.length === 0) {
-                throw new Error('Provider id must not be empty. => ' + pro);
-              }
-              const providerConfig = job.provider.find((jobProvider) => jobProvider.id === providerId);
-              if (providerConfig == null) {
-                throw new Error(`Provider Config for provider with id ${providerId} not found.`);
-              }
-              pro.init(providerConfig, job.blacklist);
-              await new FredyRuntime(
-                pro.config,
-                job.notificationAdapter,
-                providerId,
-                job.id,
-                similarityCache
-              ).execute();
+          job.provider
+            .filter((p) => fetchedProvider.find((fp) => fp.metaInformation.id === p.id) != null)
+            .forEach(async (prov) => {
+              const pro = fetchedProvider.find((fp) => fp.metaInformation.id === prov.id);
+              pro.init(prov, job.blacklist);
+              await new FredyRuntime(pro.config, job.notificationAdapter, prov.id, job.id, similarityCache).execute();
               setLastJobExecution(job.id);
             });
         });
